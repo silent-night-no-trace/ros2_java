@@ -1,5 +1,7 @@
 # ROS 2 Java client library
 
+**English** | [中文](README.zh-CN.md)
+
 > **Origin:** This is a maintained fork of the (now inactive) upstream
 > [`ros2-java/ros2_java`](https://github.com/ros2-java/ros2_java), retargeted
 > from ROS 2 Galactic to **ROS 2 Humble** and augmented with a self-contained
@@ -12,6 +14,9 @@
 | Target                                    | Status        |
 |-------------------------------------------|---------------|
 | **ROS Humble - Ubuntu Jammy (OpenJDK)** | ![Build Status](https://github.com/ros2-java/ros2_java/workflows/CI/badge.svg?branch=main) |
+
+> The badge reflects upstream `ros2-java/ros2_java` CI; this fork has no CI
+> configured. The Docker builds are the validated path here.
 
 ## Introduction
 
@@ -80,10 +85,12 @@ Humble source tree pinned by `docker/ros2_java_*_humble.repos` — i.e. it build
 **your modified source**, not upstream `main`. See [`docker/README.md`](docker/README.md)
 for the full mirror list, Android patches, and offline options.
 
-## Sounds great, how can I try this out? (manual, without Docker)
+## Manual build (without Docker)
 
-The Docker path above is recommended. The instructions below are the upstream
-manual build flow, kept for reference.
+Prefer the Docker path above — it is the only fully validated flow on this
+Humble fork. The manual steps below are an equivalent, Humble-correct
+**reference** for desktop (reproducible but not continuously tested here).
+For Android, the upstream manual flow below is obsolete; see the note there.
 
 ### Install dependencies
 
@@ -134,27 +141,43 @@ wrapper via colcon-gradle.)
 
 ### Download and Build ROS 2 Java for Desktop
 
-1. Source your ROS 2 installation, for example:
+These steps mirror `docker/Dockerfile.desktop` so the result matches the
+Docker build. `$REPO` is your local checkout of this fork.
+
+1. Source your ROS 2 Humble installation:
 
         source /opt/ros/humble/setup.bash
 
-1. Download the ROS 2 Java repositories into a workspace:
+1. Create a workspace and fetch the Humble source tree (this pulls
+   `ros2-java/ros2_java@main` as a placeholder, which we overwrite next):
 
-        mkdir -p ros2_java_ws/src
-        cd ros2_java_ws
-        curl -skL https://raw.githubusercontent.com/ros2-java/ros2_java/main/ros2_java_desktop.repos | vcs import src
+        mkdir -p ~/ros2_java_ws/src && cd ~/ros2_java_ws
+        vcs import src < "$REPO/docker/ros2_java_humble.repos"
 
-1. **Linux only** Install ROS dependencies:
+1. Overlay your local (Humble-patched) checkout on top of the placeholder,
+   so the build uses your modified source, not upstream `main`:
 
-        rosdep install --from-paths src -y -i --skip-keys "ament_tools"
+        rm -rf src/ros2-java/ros2_java
+        cp -r "$REPO" src/ros2-java/ros2_java
 
-1. Build desktop packages:
+1. Install ROS dependencies (skip-keys match the Docker build — packages we
+   don't ship or can't build here):
 
-        colcon build --symlink-install
+        rosdep install --from-paths src --ignore-src --rosdistro humble -y -r \
+          -t build -t buildtool -t build_export -t buildtool_export -t exec \
+          --skip-keys "ament_tools cyclonedds rcl_logging_log4cxx rcl_logging_spdlog rmw_connextdds rmw_connextdds_common rti_connext_dds_cmake_module rmw_cyclonedds_cpp iceoryx_binding_c"
 
-    *Note, on Windows we have to use `--merge-install`*
+1. Build the desktop package set (same default list as the Docker build):
 
-        colcon build --merge-install
+        colcon build --symlink-install --packages-up-to \
+          rcljava std_msgs std_srvs geometry_msgs nav_msgs sensor_msgs \
+          --cmake-args -DBUILD_TESTING=OFF
+
+   Adjust the `--packages-up-to` list to build more/fewer message packages.
+   On Windows use `--merge-install` instead of `--symlink-install`.
+
+After building, jars land in `install/<pkg>/share/java/*.jar` and the JNI
+`.so` in `install/<pkg>/lib/`.
 
 
 ### Download and Build ROS 2 Java for Android
@@ -163,7 +186,9 @@ wrapper via colcon-gradle.)
 > `armeabi-v7a`, API 21, the old `ros2_java_android.repos`). The Docker path
 > (`./docker/build.sh android`) is the validated modern flow: NDK 25.2,
 > `arm64-v8a`, API 31, with Fast-DDS Android patches applied. Prefer Docker
-> unless you need a custom manual setup.
+> unless you need a custom manual setup. For a Humble-correct manual Android
+> build, the toolchain args, repos pins, and Fast-DDS patches to reproduce
+> are all inlined in [`docker/Dockerfile.android`](docker/Dockerfile.android).
 
 The Android setup is slightly more complex, you'll need the SDK and NDK installed, and an Android device where you can run the examples.
 
