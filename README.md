@@ -4,6 +4,7 @@
 > [`ros2-java/ros2_java`](https://github.com/ros2-java/ros2_java), retargeted
 > from ROS 2 Galactic to **ROS 2 Humble** and augmented with a self-contained
 > Docker build system (desktop + Android AAR, with CN mirror acceleration).
+> This repository: <https://github.com/silent-night-no-trace/ros2_java>.
 > See [What changed](#what-changed-vs-upstream) below.
 
 ### Build status
