@@ -25,7 +25,7 @@ jobs:
       with:
         package-name: rosidl_generator_java rcljava_common rcljava
         target-ros2-distro: humble
-        vcs-repo-file-url: ${{ github.workspace }}/ros2_java_desktop.repos
+        vcs-repo-file-url: ${{ github.workspace }}/docker/ros2_java_humble.repos
 
   build_android:
     runs-on: ubuntu-20.04
@@ -93,7 +93,7 @@ jobs:
       run: |
         mkdir -p ros2_java_ws/src
         cd ros2_java_ws
-        curl -sL file://${{ github.workspace }}/ros2_java_android.repos | vcs import src
+        curl -sL file://${{ github.workspace }}/docker/ros2_java_android_humble.repos | vcs import src
         # Use checked out version of ros2_java
         rm -rf src/ros2-java/ros2_java
         ln --symbolic ${{ github.workspace }} src/ros2-java
