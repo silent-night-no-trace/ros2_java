@@ -1,0 +1,17 @@
+# Exclude build artifacts, VCS, docs, and the frequently-edited docker build
+# scripts from the image build context so that `COPY . ${ROS2_WS}/src/ros2-java/ros2_java`
+# stays cache-stable across iterations of the Dockerfiles/build.sh.
+# (The Dockerfile referenced by -f is always sent regardless of .dockerignore.)
+#
+# NOTE: keep docker/fetch_sources.py and docker/*.repos IN the context — they are
+# used by explicit `COPY docker/...` lines and cannot be re-included once a parent
+# dir is excluded, so we list only the volatile files explicitly.
+output/
+build.log
+.git/
+.github/
+*.md
+
+docker/Dockerfile.desktop
+docker/Dockerfile.android
+docker/build.sh

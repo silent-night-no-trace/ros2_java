@@ -1,10 +1,16 @@
 # ROS 2 Java client library
 
+> **Origin:** This is a maintained fork of the (now inactive) upstream
+> [`ros2-java/ros2_java`](https://github.com/ros2-java/ros2_java), retargeted
+> from ROS 2 Galactic to **ROS 2 Humble** and augmented with a self-contained
+> Docker build system (desktop + Android AAR, with CN mirror acceleration).
+> See [What changed](#what-changed-vs-upstream) below.
+
 ### Build status
 
 | Target                                    | Status        |
 |-------------------------------------------|---------------|
-| **ROS Galactic - Ubuntu Focal (OpenJDK)** | ![Build Status](https://github.com/ros2-java/ros2_java/workflows/CI/badge.svg?branch=main) |
+| **ROS Humble - Ubuntu Jammy (OpenJDK)** | ![Build Status](https://github.com/ros2-java/ros2_java/workflows/CI/badge.svg?branch=main) |
 
 ## Introduction
 
@@ -38,7 +44,45 @@ The current set of features include:
 - Support for Android
 - Parameters services and clients (both asynchronous and synchronous)
 
-## Sounds great, how can I try this out?
+## Quick start with Docker (recommended)
+
+This repository ships a self-contained Docker build that produces ready-to-use
+ros2_java artifacts for ROS 2 Humble, with pluggable CN mirror acceleration
+(`apt`/`pip`/`rosdistro`/ros2 apt/Android SDK/Gradle). It is the fastest and
+only fully validated path for both desktop and Android on this Humble fork.
+
+| Target | Command | Artifacts (`output/<target>/`) |
+|---|---|---|
+| Desktop (host arch, amd64) | `./docker/build.sh desktop` | `jars/`, `lib/*.so`, `share/` |
+| Android AAR (arm64-v8a, API 31) | `./docker/build.sh android` | `*.aar`, `jars/`, `jniLibs/`, `share/` |
+
+```bash
+# Desktop: rcljava.jar + message jars + host .so
+./docker/build.sh desktop
+
+# Android: arm64-v8a AAR (NDK 25.2, Fast-DDS patches applied)
+./docker/build.sh android
+
+# Disable CN mirrors (use official sources)
+USE_CN_MIRROR=0 ./docker/build.sh desktop
+
+# Customize the set of desktop message packages
+./docker/build.sh desktop \
+  --build-arg BUILD_PACKAGES_UP_TO="rcljava std_msgs sensor_msgs"
+
+# Force a clean rebuild
+./docker/build.sh android --no-cache
+```
+
+The build layers your local checkout (with the Humble changes) on top of the
+Humble source tree pinned by `docker/ros2_java_*_humble.repos` — i.e. it builds
+**your modified source**, not upstream `main`. See [`docker/README.md`](docker/README.md)
+for the full mirror list, Android patches, and offline options.
+
+## Sounds great, how can I try this out? (manual, without Docker)
+
+The Docker path above is recommended. The instructions below are the upstream
+manual build flow, kept for reference.
 
 ### Install dependencies
 
@@ -48,12 +92,17 @@ The current set of features include:
 
 1. Install Java and a JDK.
 
-    On Ubuntu, you can install OpenJDK with:
+    This Humble fork builds with OpenJDK 11 and targets Java 8 bytecode
+    (`-source/-target 1.8`), so the resulting jars run on JDK 8+.
 
-        sudo apt install default-jdk
+    On Ubuntu, you can install OpenJDK 11 with:
+
+        sudo apt install openjdk-11-jdk
 
 1. Install Gradle.
-Make sure you have Gradle 3.2 (or later) installed.
+Make sure you have Gradle 3.2 (or later) installed. (The Android Docker
+build uses Gradle 7.6; for desktop, each jar package brings its own Gradle
+wrapper via colcon-gradle.)
 
     *Ubuntu Bionic or later*
 
@@ -86,7 +135,7 @@ Make sure you have Gradle 3.2 (or later) installed.
 
 1. Source your ROS 2 installation, for example:
 
-        source /opt/ros/galactic/setup.bash
+        source /opt/ros/humble/setup.bash
 
 1. Download the ROS 2 Java repositories into a workspace:
 
@@ -108,6 +157,12 @@ Make sure you have Gradle 3.2 (or later) installed.
 
 
 ### Download and Build ROS 2 Java for Android
+
+> **Note:** The manual steps below are the legacy upstream reference (NDK 16b,
+> `armeabi-v7a`, API 21, the old `ros2_java_android.repos`). The Docker path
+> (`./docker/build.sh android`) is the validated modern flow: NDK 25.2,
+> `arm64-v8a`, API 31, with Fast-DDS Android patches applied. Prefer Docker
+> unless you need a custom manual setup.
 
 The Android setup is slightly more complex, you'll need the SDK and NDK installed, and an Android device where you can run the examples.
 
@@ -159,6 +214,25 @@ Although the `ros2_java_android.repos` file contains all the repositories for th
           -DCMAKE_FIND_ROOT_PATH="${PWD}/install"
 
 You can find more information about the Android examples at https://github.com/ros2-java/ros2_android_examples
+
+## What changed vs upstream
+
+Source-level changes relative to [`ros2-java/ros2_java`](https://github.com/ros2-java/ros2_java) `main`:
+
+- **ROS 2 Galactic → Humble**: CI workflow `ubuntu-20.04` → `ubuntu-22.04`,
+  `required-ros-distributions`/`target-ros2-distro` `galactic` → `humble`;
+  README install snippets `source /opt/ros/galactic` → `humble`.
+- **Java bytecode target 1.6 → 1.8**: `rcljava/CMakeLists.txt` and
+  `rcljava_common/CMakeLists.txt` set `CMAKE_JAVA_COMPILE_FLAGS` to
+  `-source/-target 1.8`, so jars build on JDK 11/17 and run on JDK 8+.
+  C++/CMake/rosidl templates are otherwise unchanged.
+- **New Docker build system** (untracked, under `docker/`): one-command
+  builds for desktop and Android AAR, pinned to Humble source via
+  `docker/ros2_java_*_humble.repos`, with pluggable CN mirrors and the
+  Android Fast-DDS patches inlined. See [`docker/README.md`](docker/README.md).
+
+The `.dockerignore` and `docker/` tree are new; everything else above is a
+modification of existing upstream files.
 
 ## Contributing
 

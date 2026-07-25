@@ -1,0 +1,11 @@
+# Do not send these into the Docker build context (keeps it small & avoids stale artifacts).
+.git
+.gitignore
+**/build/
+**/install/
+output/
+**/__pycache__/
+*.pyc
+.DS_Store
+.vscode/
+.github/

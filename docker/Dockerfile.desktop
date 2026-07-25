@@ -1,0 +1,137 @@
+###############################################################################
+# ROS 2 Humble + ros2_java Desktop builder (x86_64 / host arch)
+# - 国产镜像：apt(tuna) / pip(tuna) / rosdistro(ustc) / ros2 apt(ustc)
+# - 用本地 checkout 覆盖 vcs 拉到的 ros2_java（即构建你改过的源码）
+# - 输出：/output  -> jars / lib( *.so ) / share
+###############################################################################
+# syntax=docker/dockerfile:1
+
+FROM ros:humble-ros-base-jammy AS builder
+
+ARG USE_CN_MIRROR=1
+ARG APT_MIRROR_HOST=mirrors.tuna.tsinghua.edu.cn
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ARG ROS_APT_MIRROR=https://mirrors.ustc.edu.cn/ros2/ubuntu
+ARG ROSDISTRO_INDEX_URL=https://mirrors.ustc.edu.cn/rosdistro/index-v4.yaml
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV ROSDISTRO_INDEX_URL=${ROSDISTRO_INDEX_URL}
+
+SHELL ["/bin/bash", "-c"]
+
+# ---- apt 国内镜像 + ROS2 apt 源指向镜像 ----
+# 基础镜像 ros:humble-ros-base-jammy 自带 ros2 apt 源（指向 packages.ros.org，
+# 国内 apt update 很慢），先把它改写到 USTC 镜像；若基础镜像没有 ros2 源则兜底自建。
+RUN set -euo pipefail; \
+    if [ "${USE_CN_MIRROR}" = "1" ]; then \
+      sed -i "s|http://archive.ubuntu.com/ubuntu|https://${APT_MIRROR_HOST}/ubuntu|g" /etc/apt/sources.list; \
+      sed -i "s|http://security.ubuntu.com/ubuntu|https://${APT_MIRROR_HOST}/ubuntu|g" /etc/apt/sources.list; \
+      # 用 /etc/apt/sources.list.d/* 而非 *.list：基础镜像可能用 deb822 的 .sources 文件
+      sed -i "s|http://packages.ros.org/ros2/ubuntu|${ROS_APT_MIRROR}|g" /etc/apt/sources.list.d/* 2>/dev/null || true; \
+      sed -i "s|https://packages.ros.org/ros2/ubuntu|${ROS_APT_MIRROR}|g" /etc/apt/sources.list.d/* 2>/dev/null || true; \
+    fi; \
+    # 不需要源码包索引：剥离 deb-src 行（.list）和 deb822 的 deb-src 类型（.sources），
+    # 既省下载又避免镜像 Sources.gz 同步中报 size mismatch（exit 100）。
+    sed -i '/^deb-src /d' /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null || true; \
+    for f in /etc/apt/sources.list.d/*.sources; do [ -f "$f" ] && sed -i 's/^Types:.*deb-src.*/Types: deb/' "$f" || true; done; \
+    if ! grep -rh "ros2/ubuntu" /etc/apt/sources.list.d/* 2>/dev/null | grep -q .; then \
+      codename="$(. /etc/os-release; echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")"; \
+      arch="$(dpkg --print-architecture)"; \
+      if [ ! -f /usr/share/keyrings/ros-archive-keyring.gpg ]; then \
+        curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+          | gpg --dearmor -o /usr/share/keyrings/ros-archive-keyring.gpg; \
+      fi; \
+      ros_apt_url="${ROS_APT_MIRROR}"; \
+      if [ "${USE_CN_MIRROR}" != "1" ]; then ros_apt_url="https://packages.ros.org/ros2/ubuntu"; fi; \
+      echo "deb [arch=${arch} signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] ${ros_apt_url} ${codename} main" \
+        > /etc/apt/sources.list.d/ros2.list; \
+    fi
+
+# ---- 构建依赖 ----
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      wget \
+      git \
+      build-essential \
+      cmake \
+      ninja-build \
+      openjdk-11-jdk \
+      python3 \
+      python3-pip \
+      python3-vcstool \
+      python3-colcon-common-extensions \
+      python3-rosdep \
+      python3-lark \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /root/.pip && printf "[global]\nindex-url = %s\n" "${PIP_INDEX_URL}" > /root/.pip/pip.conf
+
+# ---- colcon gradle 扩展（ros2_java 用 Gradle 构建 jar）----
+RUN retry_wget() { local out="$1"; shift; local n=0; until [ "$n" -ge 3 ]; do wget -O "$out" "$@" && return 0; n=$((n+1)); sleep 2; done; return 1; }; \
+    retry_wget /tmp/colcon-gradle.tar.gz "https://codeload.github.com/colcon/colcon-gradle/tar.gz/refs/heads/main" && \
+    pip3 install --no-cache-dir /tmp/colcon-gradle.tar.gz && rm -f /tmp/colcon-gradle.tar.gz && \
+    retry_wget /tmp/colcon-ros-gradle.tar.gz "https://codeload.github.com/colcon/colcon-ros-gradle/tar.gz/refs/heads/main" && \
+    pip3 install --no-cache-dir --no-deps /tmp/colcon-ros-gradle.tar.gz && rm -f /tmp/colcon-ros-gradle.tar.gz
+
+# ---- 工作区：拉取 humble 源码 ----
+ENV ROS2_WS=/opt/ros2_ws
+RUN mkdir -p ${ROS2_WS}/src
+COPY docker/fetch_sources.py /usr/local/bin/fetch_sources.py
+COPY docker/ros2_java_humble.repos ${ROS2_WS}/ros2_java_humble.repos
+RUN python3 /usr/local/bin/fetch_sources.py --repos ${ROS2_WS}/ros2_java_humble.repos --src ${ROS2_WS}/src
+
+# ---- 用本地改过的 ros2_java 覆盖 ----
+COPY . ${ROS2_WS}/src/ros2-java/ros2_java
+
+# ---- rosdep 解析依赖（humble）----
+# rosdep update 会拉取所有发行版（含古老的 fuerte.yaml），国内镜像对 fuerte 偶发
+# SSL 超时；但 humble 的缓存会正常生成，fuerte 等失败不影响 rosdep install --rosdistro humble，
+# 故 rosdep update 失败不致命。
+RUN set -euo pipefail; \
+    rosdep init 2>/dev/null || true; \
+    if [ -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then \
+      sed -i 's|https://raw.githubusercontent.com/ros/rosdistro/master|https://mirrors.ustc.edu.cn/rosdistro|g' /etc/ros/rosdep/sources.list.d/20-default.list; \
+    fi; \
+    for i in 1 2 3; do rosdep update --rosdistro humble 2>&1 || true; sleep 2; done; \
+    apt-get -o Acquire::Retries=5 update; \
+    cd ${ROS2_WS} && \
+    rosdep install \
+      --from-paths src \
+      --ignore-src \
+      --rosdistro humble \
+      -y -r \
+      -t build -t buildtool -t build_export -t buildtool_export -t exec \
+      --skip-keys "ament_tools cyclonedds rcl_logging_log4cxx rcl_logging_spdlog rmw_connextdds rmw_connextdds_common rti_connext_dds_cmake_module rmw_cyclonedds_cpp iceoryx_binding_c"; \
+    rm -rf /var/lib/apt/lists/*
+
+# ---- 构建 ----
+# ARG 在此声明（而非文件顶部），使改包列表时只作废 colcon/收集层，
+# 不影响前面的 apt-deps/rosdep 层（这些层不依赖包列表）。
+ARG BUILD_PACKAGES_UP_TO="rcljava std_msgs std_srvs geometry_msgs nav_msgs sensor_msgs"
+# 注意：不使用 `set -u`，因为 source /opt/ros/humble/setup.bash 会引用未定义的
+# AMENT_TRACE_SETUP_FILES 等变量，在 -u 下会立即失败。
+RUN set -eo pipefail; \
+    source /opt/ros/humble/setup.bash; \
+    cd ${ROS2_WS}; \
+    colcon build \
+      --packages-up-to ${BUILD_PACKAGES_UP_TO} \
+      --symlink-install \
+      --cmake-args -DBUILD_TESTING=OFF
+
+# ---- 汇出产物 ----
+# jar 实际在 install/<pkg>/share/java/*.jar（share 与 java 之间无中间层）；
+# share 是 per-package：install/<pkg>/share/<pkg>/...，逐个合并到 /output/share。
+# colcon --symlink-install 下 install 树里的 jar 是指向 build 树的符号链接，
+# 故 find 需匹配 -type l 并用 cp -fL 解引用拷出真实文件，否则 -type f 抓不到。
+RUN set -eo pipefail; \
+    mkdir -p /output/jars /output/lib /output/share; \
+    find ${ROS2_WS}/install \( -type f -o -type l \) -name "*.jar" -exec cp -fL {} /output/jars/ \; ; \
+    find ${ROS2_WS}/install -type f -name "*.so"  -exec cp -f {} /output/lib/ \; ; \
+    for d in ${ROS2_WS}/install/*/share; do [ -d "$d" ] && cp -aL "$d/." /output/share/; done; \
+    echo "jars: $(ls /output/jars 2>/dev/null | wc -l)  libs: $(ls /output/lib 2>/dev/null | wc -l)  share-dirs: $(ls /output/share 2>/dev/null | wc -l)"; \
+    ls -lh /output/jars 2>/dev/null | head -40 || true
+
+FROM scratch AS output
+COPY --from=builder /output /output
