@@ -87,10 +87,12 @@ for the full mirror list, Android patches, and offline options.
 
 ## Manual build (without Docker)
 
-Prefer the Docker path above — it is the only fully validated flow on this
-Humble fork. The manual steps below are an equivalent, Humble-correct
-**reference** for desktop (reproducible but not continuously tested here).
-For Android, the upstream manual flow below is obsolete; see the note there.
+Prefer the Docker path above — it is the fully validated, continuously
+tested flow on this Humble fork. The manual steps below are an equivalent,
+Humble-correct desktop flow that has been verified end-to-end on bare metal
+(16 packages, `BUILD_TESTING=OFF`). It is not re-run in CI; Docker remains
+the recommended path. For Android, the upstream manual flow below is
+obsolete; see the note there.
 
 ### Install dependencies
 
@@ -130,9 +132,9 @@ wrapper via colcon-gradle.)
 
         choco install gradle
 
-1. Install build tools:
+1. Install build tools (`rsync` is used by the overlay step below):
 
-        sudo apt install curl python3-colcon-common-extensions python3-pip python3-vcstool
+        sudo apt install curl python3-colcon-common-extensions python3-pip python3-vcstool rsync
 
 1. Install Gradle extensions for colcon:
 
@@ -155,17 +157,35 @@ Docker build. `$REPO` is your local checkout of this fork.
         vcs import src < "$REPO/docker/ros2_java_humble.repos"
 
 1. Overlay your local (Humble-patched) checkout on top of the placeholder,
-   so the build uses your modified source, not upstream `main`:
+   so the build uses your modified source, not upstream `main`. Exclude
+   `.git`, `output/`, and prior build dirs so they don't pollute the
+   workspace (Docker gets the same effect via `.dockerignore`):
 
         rm -rf src/ros2-java/ros2_java
-        cp -r "$REPO" src/ros2-java/ros2_java
+        rsync -a --exclude='.git' --exclude='output' \
+          --exclude='build' --exclude='install' --exclude='log' \
+          "$REPO"/ src/ros2-java/ros2_java/
 
-1. Install ROS dependencies (skip-keys match the Docker build — packages we
-   don't ship or can't build here):
+1. Initialize rosdep (first time only on a fresh machine — the Docker build
+   does this inside the image). Behind the CN mirrors, repoint rosdistro to
+   USTC first to avoid `raw.githubusercontent.com` timeouts during
+   `rosdep update`:
+
+        sudo rosdep init
+        sudo sed -i 's|https://raw.githubusercontent.com/ros/rosdistro/master|https://mirrors.ustc.edu.cn/rosdistro|g' \
+          /etc/ros/rosdep/sources.list.d/20-default.list
+        rosdep update
+
+1. Install ROS dependencies. `rosdep install` runs `sudo apt-get install`
+   under the hood, so (like `rosdep init` above) it needs interactive or
+   passwordless sudo. The skip-keys match the Docker build, plus
+   `test_interface_files` — its apt package `ros-humble-test-interface-files`
+   is only a test fixture and is not needed under `BUILD_TESTING=OFF`
+   (verified: the full desktop build succeeds without it):
 
         rosdep install --from-paths src --ignore-src --rosdistro humble -y -r \
           -t build -t buildtool -t build_export -t buildtool_export -t exec \
-          --skip-keys "ament_tools cyclonedds rcl_logging_log4cxx rcl_logging_spdlog rmw_connextdds rmw_connextdds_common rti_connext_dds_cmake_module rmw_cyclonedds_cpp iceoryx_binding_c"
+          --skip-keys "ament_tools cyclonedds rcl_logging_log4cxx rcl_logging_spdlog rmw_connextdds rmw_connextdds_common rti_connext_dds_cmake_module rmw_cyclonedds_cpp iceoryx_binding_c test_interface_files"
 
 1. Build the desktop package set (same default list as the Docker build):
 

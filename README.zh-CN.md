@@ -84,8 +84,9 @@ USE_CN_MIRROR=0 ./docker/build.sh desktop
 
 ## 手动构建（无 Docker）
 
-推荐上面的 Docker 路径——它是本 Humble fork 上唯一完全验证过的流程。
-下面的手动步骤是与之等价、对 Humble 正确的桌面**参考流程**（可复现，但本仓库未持续测试）。
+推荐上面的 Docker 路径——它是本 Humble fork 上完全验证、持续测试的流程。
+下面的手动步骤是与之等价、对 Humble 正确的桌面流程，已在裸机端到端验证通过
+（16 个包，`BUILD_TESTING=OFF`）。它不在 CI 中复跑；Docker 仍是推荐路径。
 Android 的上游手动流程已过时，见该段末尾说明。
 
 ### 安装依赖
@@ -119,9 +120,9 @@ Android 的上游手动流程已过时，见该段末尾说明。
 
         choco install gradle
 
-1. 安装构建工具：
+1. 安装构建工具（`rsync` 用于下面的源码覆盖步骤）：
 
-        sudo apt install curl python3-colcon-common-extensions python3-pip python3-vcstool
+        sudo apt install curl python3-colcon-common-extensions python3-pip python3-vcstool rsync
 
 1. 安装 colcon 的 Gradle 扩展：
 
@@ -142,16 +143,33 @@ Android 的上游手动流程已过时，见该段末尾说明。
         mkdir -p ~/ros2_java_ws/src && cd ~/ros2_java_ws
         vcs import src < "$REPO/docker/ros2_java_humble.repos"
 
-1. 用本地（Humble 改造过的）checkout 覆盖占位，使构建用你的源码而非上游 `main`：
+1. 用本地（Humble 改造过的）checkout 覆盖占位，使构建用你的源码而非上游 `main`。
+   排除 `.git`、`output/` 及已有的 build 目录，避免污染工作区（Docker 靠
+   `.dockerignore` 达到同样效果）：
 
         rm -rf src/ros2-java/ros2_java
-        cp -r "$REPO" src/ros2-java/ros2_java
+        rsync -a --exclude='.git' --exclude='output' \
+          --exclude='build' --exclude='install' --exclude='log' \
+          "$REPO"/ src/ros2-java/ros2_java/
 
-1. 安装 ROS 依赖（skip-keys 与 Docker 一致——不发布或在此构建不了的包）：
+1. 初始化 rosdep（全新机器首次才需要——Docker 构建在镜像内已做）。
+   国内镜像环境下，先把 rosdistro 指向 USTC，避免 `rosdep update` 拉
+   `raw.githubusercontent.com` 超时：
+
+        sudo rosdep init
+        sudo sed -i 's|https://raw.githubusercontent.com/ros/rosdistro/master|https://mirrors.ustc.edu.cn/rosdistro|g' \
+          /etc/ros/rosdep/sources.list.d/20-default.list
+        rosdep update
+
+1. 安装 ROS 依赖。`rosdep install` 内部会执行 `sudo apt-get install`，
+   故与上面的 `rosdep init` 一样需要交互式或免密 sudo。skip-keys 与 Docker
+   一致，另加 `test_interface_files`——其 apt 包
+   `ros-humble-test-interface-files` 只是测试夹具，`BUILD_TESTING=OFF` 下用不到
+   （已验证：跳过它桌面完整构建照常成功）：
 
         rosdep install --from-paths src --ignore-src --rosdistro humble -y -r \
           -t build -t buildtool -t build_export -t buildtool_export -t exec \
-          --skip-keys "ament_tools cyclonedds rcl_logging_log4cxx rcl_logging_spdlog rmw_connextdds rmw_connextdds_common rti_connext_dds_cmake_module rmw_cyclonedds_cpp iceoryx_binding_c"
+          --skip-keys "ament_tools cyclonedds rcl_logging_log4cxx rcl_logging_spdlog rmw_connextdds rmw_connextdds_common rti_connext_dds_cmake_module rmw_cyclonedds_cpp iceoryx_binding_c test_interface_files"
 
 1. 构建桌面包集合（与 Docker 默认包列表一致）：
 
