@@ -11,12 +11,14 @@
 
 ### Build status
 
-| Target                                    | Status        |
-|-------------------------------------------|---------------|
-| **ROS Humble - Ubuntu Jammy (OpenJDK)** | ![Build Status](https://github.com/ros2-java/ros2_java/workflows/CI/badge.svg?branch=main) |
+[![CI](https://github.com/silent-night-no-trace/ros2_java/actions/workflows/build_and_test.yml/badge.svg?branch=main)](https://github.com/silent-night-no-trace/ros2_java/actions/workflows/build_and_test.yml)
 
-> The badge reflects upstream `ros2-java/ros2_java` CI; this fork has no CI
-> configured. The Docker builds are the validated path here.
+> The badge reflects this fork's own CI
+> ([`.github/workflows/build_and_test.yml`](.github/workflows/build_and_test.yml)),
+> which builds both the desktop jars/`.so` and the Android AAR via the validated
+> Docker path (`./docker/build.sh desktop|android` against official sources).
+> Build artifacts are uploaded per run. The Docker build is also the recommended
+> path for local builds.
 
 ## Introduction
 

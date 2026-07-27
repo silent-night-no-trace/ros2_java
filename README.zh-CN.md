@@ -11,12 +11,13 @@
 
 ### 构建状态
 
-| 目标 | 状态 |
-|---|---|
-| **ROS Humble - Ubuntu Jammy（OpenJDK）** | ![Build Status](https://github.com/ros2-java/ros2_java/workflows/CI/badge.svg?branch=main) |
+[![CI](https://github.com/silent-night-no-trace/ros2_java/actions/workflows/build_and_test.yml/badge.svg?branch=main)](https://github.com/silent-night-no-trace/ros2_java/actions/workflows/build_and_test.yml)
 
-> 该徽章反映的是上游 `ros2-java/ros2_java` 的 CI；本 fork 未配置 CI。
-> Docker 构建是本仓库的已验证路径。
+> 该徽章反映本 fork 自己的 CI
+>（[`.github/workflows/build_and_test.yml`](.github/workflows/build_and_test.yml)），
+> 经已验证的 Docker 路径（`./docker/build.sh desktop|android`，走官方源）构建
+> 桌面 jar/`.so` 与 Android AAR。每次运行都会上传构建产物。本地构建同样推荐
+> Docker 路径。
 
 ## 简介
 
