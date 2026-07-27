@@ -13,6 +13,11 @@
 
 [![CI](https://github.com/silent-night-no-trace/ros2_java/actions/workflows/build_and_test.yml/badge.svg?branch=main)](https://github.com/silent-night-no-trace/ros2_java/actions/workflows/build_and_test.yml)
 
+| Target | Build platform |
+|---|---|
+| Desktop (jars + host `.so`) | **ROS 2 Humble** · Ubuntu 22.04 Jammy · OpenJDK 11 |
+| Android AAR (`arm64-v8a`) | **ROS 2 Humble** · Ubuntu 22.04 Jammy (container) · NDK 25.2 / API 31 / Fast-DDS 2.6.x |
+
 > The badge reflects this fork's own CI
 > ([`.github/workflows/build_and_test.yml`](.github/workflows/build_and_test.yml)),
 > which builds both the desktop jars/`.so` and the Android AAR via the validated

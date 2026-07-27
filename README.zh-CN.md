@@ -13,6 +13,11 @@
 
 [![CI](https://github.com/silent-night-no-trace/ros2_java/actions/workflows/build_and_test.yml/badge.svg?branch=main)](https://github.com/silent-night-no-trace/ros2_java/actions/workflows/build_and_test.yml)
 
+| 目标 | 构建平台 |
+|---|---|
+| 桌面（jar + 本机 `.so`） | **ROS 2 Humble** · Ubuntu 22.04 Jammy · OpenJDK 11 |
+| Android AAR（`arm64-v8a`） | **ROS 2 Humble** · Ubuntu 22.04 Jammy（容器内） · NDK 25.2 / API 31 / Fast-DDS 2.6.x |
+
 > 该徽章反映本 fork 自己的 CI
 >（[`.github/workflows/build_and_test.yml`](.github/workflows/build_and_test.yml)），
 > 经已验证的 Docker 路径（`./docker/build.sh desktop|android`，走官方源）构建
