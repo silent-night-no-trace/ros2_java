@@ -1,0 +1,48 @@
+name: Release
+
+# Build the Android AAR + desktop bundle via the validated Docker path and
+# attach them to a GitHub Release for the pushed tag. Triggered by pushing
+# a `v*` tag, or manually for an existing tag (Actions tab → Run workflow).
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag (e.g. v1.0.0) to (re)publish'
+        required: true
+
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    permissions:
+      contents: write   # needed to create the Release and upload assets
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build Android AAR + desktop (Docker)
+        run: |
+          USE_CN_MIRROR=0 ./docker/build.sh android
+          USE_CN_MIRROR=0 ./docker/build.sh desktop
+
+      - name: Package desktop bundle
+        run: (cd output/desktop && zip -rq "$GITHUB_WORKSPACE/ros2_java_humble_desktop.zip" .)
+
+      - name: Create GitHub Release and upload assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "==> Publishing release for tag: $TAG"
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "$TAG" \
+              --notes "Built from tag $TAG. See the README for build and usage."
+          fi
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+            output/android/*.aar "$GITHUB_WORKSPACE/ros2_java_humble_desktop.zip"
+          echo "==> Done: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"

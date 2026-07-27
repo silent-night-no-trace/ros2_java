@@ -22,7 +22,9 @@
 >（[`.github/workflows/build_and_test.yml`](.github/workflows/build_and_test.yml)），
 > 经已验证的 Docker 路径（`./docker/build.sh desktop|android`，走官方源）构建
 > 桌面 jar/`.so` 与 Android AAR。每次运行都会上传构建产物。本地构建同样推荐
-> Docker 路径。
+> Docker 路径。推送 `v*` tag 会将 Android AAR 与桌面打包件发布到
+> [GitHub Releases](https://github.com/silent-night-no-trace/ros2_java/releases)
+>（见 [`.github/workflows/release.yml`](.github/workflows/release.yml)）。
 
 ## 简介
 

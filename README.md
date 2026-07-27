@@ -23,7 +23,9 @@
 > which builds both the desktop jars/`.so` and the Android AAR via the validated
 > Docker path (`./docker/build.sh desktop|android` against official sources).
 > Build artifacts are uploaded per run. The Docker build is also the recommended
-> path for local builds.
+> path for local builds. Pushing a `v*` tag publishes the Android AAR and a
+> desktop bundle to [GitHub Releases](https://github.com/silent-night-no-trace/ros2_java/releases)
+> (see [`.github/workflows/release.yml`](.github/workflows/release.yml)).
 
 ## Introduction
 
