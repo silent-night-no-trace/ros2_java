@@ -85,9 +85,9 @@ USE_CN_MIRROR=0 ./docker/build.sh desktop
 ## 手动构建（无 Docker）
 
 推荐上面的 Docker 路径——它是本 Humble fork 上完全验证、持续测试的流程。
-下面的手动步骤是与之等价、对 Humble 正确的桌面流程，已在裸机端到端验证通过
-（16 个包，`BUILD_TESTING=OFF`）。它不在 CI 中复跑；Docker 仍是推荐路径。
-Android 的上游手动流程已过时，见该段末尾说明。
+下面的手动步骤是对 Humble 正确的**桌面与 Android** 配方，均在裸机端到端验证通过
+（桌面：16 个包，`BUILD_TESTING=OFF`；Android：112 个包、约 56MB AAR / 334 个 `.so`）。
+它们不在 CI 中复跑；Docker 仍是推荐路径。
 
 ### 安装依赖
 
@@ -132,10 +132,11 @@ Android 的上游手动流程已过时，见该段末尾说明。
 ### 下载并构建桌面版 ROS 2 Java
 
 下列步骤镜像 `docker/Dockerfile.desktop`，结果与 Docker 构建一致。
-`$REPO` 为本 fork 的本地 checkout 路径。
+请在仓库根目录执行，并先 `export REPO=$(pwd)`（下面的 Android 段复用该变量）：
 
 1. source ROS 2 Humble 安装：
 
+        export REPO=$(pwd)
         source /opt/ros/humble/setup.bash
 
 1. 建工作区并拉取 Humble 源码树（其中 `ros2-java/ros2_java@main` 是占位，下一步覆盖）：
@@ -192,6 +193,8 @@ Android 的上游手动流程已过时，见该段末尾说明。
 > 仍是推荐路径。配方镜像
 > [`docker/Dockerfile.android`](docker/Dockerfile.android)，用用户级路径
 > （工具链无需 sudo）；完整 pin 版本表见 [`docker/README.md`](docker/README.md)。
+> 请在仓库根目录执行并 `export REPO=$(pwd)`（同桌面段）——下面多处引用
+> `$REPO/docker/...`。
 
 目标：`arm64-v8a`、Android API 31、NDK 25.2.9519653、build-tools 33.0.2、
 CMake 3.22.1、Gradle 7.6、Fast-DDS 2.6.x。JDK 11 构建 jar；JDK 17 仅用于跑
@@ -328,7 +331,7 @@ CMake 3.22.1、Gradle 7.6、Fast-DDS 2.6.x。JDK 11 构建 jar；JDK 17 仅用�
 
 1. 临时注销宿主的 `rosidl_generator_py`，使交叉构建不为 aarch64 目标生成
    Python 接口（否则会因缺 `aarch64-linux-gnu/python3.10/pyconfig.h` 失败）。
-   这会改系统 ROS 安装，故先备份，**构建后还原**（步骤 12）。需 sudo：
+   这会改系统 ROS 安装，故先备份，**构建后还原**（步骤 13）。需 sudo：
 
         sudo bash -c '
         B=/opt/ros/humble/share/ament_index/resource_index
@@ -383,7 +386,7 @@ CMake 3.22.1、Gradle 7.6、Fast-DDS 2.6.x。JDK 11 构建 jar；JDK 17 仅用�
         bash $REPO/docker/build_android12_aar.sh
         # -> $WS/output/ros2_java_android_humble_arm64-v8a_release.aar (+ jars/, jniLibs/, share/)
 
-1. 还原宿主的 `rosidl_generator_py`（撤销步骤 8）：
+1. 还原宿主的 `rosidl_generator_py`（撤销步骤 9）：
 
         sudo bash -c '
         B=/opt/ros/humble/share/ament_index/resource_index

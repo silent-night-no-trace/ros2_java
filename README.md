@@ -35,7 +35,7 @@ No, any language that targets the JVM can be used to write ROS 2 applications.
 
 ### Including Android?
 
-Yep! Make sure to use Fast-RTPS as your DDS vendor and at least [this revision](https://github.com/eProsima/Fast-RTPS/commit/5301ef203d45528a083821c3ba582164d782360b).
+Yep! Use Fast-DDS as your DDS vendor (pinned to 2.6.x on this Humble fork).
 
 ### Features
 
@@ -88,11 +88,11 @@ for the full mirror list, Android patches, and offline options.
 ## Manual build (without Docker)
 
 Prefer the Docker path above — it is the fully validated, continuously
-tested flow on this Humble fork. The manual steps below are an equivalent,
-Humble-correct desktop flow that has been verified end-to-end on bare metal
-(16 packages, `BUILD_TESTING=OFF`). It is not re-run in CI; Docker remains
-the recommended path. For Android, the upstream manual flow below is
-obsolete; see the note there.
+tested flow on this Humble fork. The manual steps below are Humble-correct
+recipes for **both desktop and Android**, each verified end-to-end on bare
+metal (desktop: 16 packages, `BUILD_TESTING=OFF`; Android: 112 packages,
+~56 MB AAR / 334 `.so`). They are not re-run in CI; Docker remains the
+recommended path.
 
 ### Install dependencies
 
@@ -144,10 +144,12 @@ wrapper via colcon-gradle.)
 ### Download and Build ROS 2 Java for Desktop
 
 These steps mirror `docker/Dockerfile.desktop` so the result matches the
-Docker build. `$REPO` is your local checkout of this fork.
+Docker build. Run them from the repo root and export it as `REPO` first
+(the Android section reuses the same variable):
 
 1. Source your ROS 2 Humble installation:
 
+        export REPO=$(pwd)
         source /opt/ros/humble/setup.bash
 
 1. Create a workspace and fetch the Humble source tree (this pulls
@@ -211,7 +213,9 @@ After building, jars land in `install/<pkg>/share/java/*.jar` and the JNI
 > CI; Docker remains the recommended path. The recipe mirrors
 > [`docker/Dockerfile.android`](docker/Dockerfile.android) with user-local
 > paths (no sudo for the toolchain); see [`docker/README.md`](docker/README.md)
-> for the full pinned version table.
+> for the full pinned version table. Run from the repo root with
+> `export REPO=$(pwd)` (as set in the desktop section) — several steps below
+> reference `$REPO/docker/...`.
 
 Target: `arm64-v8a`, Android API 31, NDK 25.2.9519653, build-tools 33.0.2,
 CMake 3.22.1, Gradle 7.6, Fast-DDS 2.6.x. JDK 11 builds the jars; JDK 17 is
@@ -352,7 +356,7 @@ only needed to run `sdkmanager` (its bytecode target).
    does not try to generate Python interfaces for the aarch64 target (which
    fails on the missing `aarch64-linux-gnu/python3.10/pyconfig.h`). This edits
    the system ROS install, so back it up and **restore it after the build**
-   (step 12). Requires sudo:
+   (step 13). Requires sudo:
 
         sudo bash -c '
         B=/opt/ros/humble/share/ament_index/resource_index
@@ -408,7 +412,7 @@ only needed to run `sdkmanager` (its bytecode target).
         bash $REPO/docker/build_android12_aar.sh
         # -> $WS/output/ros2_java_android_humble_arm64-v8a_release.aar (+ jars/, jniLibs/, share/)
 
-1. Restore the host's `rosidl_generator_py` (undo step 8):
+1. Restore the host's `rosidl_generator_py` (undo step 9):
 
         sudo bash -c '
         B=/opt/ros/humble/share/ament_index/resource_index
@@ -430,7 +434,7 @@ Source-level changes relative to [`ros2-java/ros2_java`](https://github.com/ros2
   `rcljava_common/CMakeLists.txt` set `CMAKE_JAVA_COMPILE_FLAGS` to
   `-source/-target 1.8`, so jars build on JDK 11/17 and run on JDK 8+.
   C++/CMake/rosidl templates are otherwise unchanged.
-- **New Docker build system** (untracked, under `docker/`): one-command
+- **New Docker build system** (under `docker/`): one-command
   builds for desktop and Android AAR, pinned to Humble source via
   `docker/ros2_java_*_humble.repos`, with pluggable CN mirrors and the
   Android Fast-DDS patches inlined. See [`docker/README.md`](docker/README.md).
