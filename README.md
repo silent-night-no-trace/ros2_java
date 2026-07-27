@@ -131,12 +131,6 @@ wrapper via colcon-gradle.)
 
         brew install gradle
 
-    Note: if run into compatibily issues between gradle 3.x and Java 9, try using Java 8,
-
-        brew tap caskroom/versions
-        brew cask install java8
-        export JAVA_HOME=/Library/Java/JavaVirtualMachines/1.8.0.jdk/Contents/Home
-
     *Windows*
 
         choco install gradle
@@ -436,9 +430,14 @@ You can find more information about the Android examples at https://github.com/r
 
 Source-level changes relative to [`ros2-java/ros2_java`](https://github.com/ros2-java/ros2_java) `main`:
 
-- **ROS 2 Galactic → Humble**: CI workflow `ubuntu-20.04` → `ubuntu-22.04`,
-  `required-ros-distributions`/`target-ros2-distro` `galactic` → `humble`;
-  README install snippets `source /opt/ros/galactic` → `humble`.
+- **ROS 2 Galactic → Humble**: sources retargeted to Humble — the Docker
+  images, manual recipes, and README snippets all use
+  `source /opt/ros/humble`. The upstream Galactic-era CI was **replaced**
+  (not merely retargeted): this fork's
+  [CI](.github/workflows/build_and_test.yml) builds the desktop jars/`.so`
+  and the Android AAR via the Docker path, and a new tag-driven
+  [release](.github/workflows/release.yml) workflow publishes those artifacts
+  to GitHub Releases.
 - **Java bytecode target 1.6 → 1.8**: `rcljava/CMakeLists.txt` and
   `rcljava_common/CMakeLists.txt` set `CMAKE_JAVA_COMPILE_FLAGS` to
   `-source/-target 1.8`, so jars build on JDK 11/17 and run on JDK 8+.

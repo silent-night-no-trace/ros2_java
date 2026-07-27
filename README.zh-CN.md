@@ -409,9 +409,12 @@ CMake 3.22.1、Gradle 7.6、Fast-DDS 2.6.x。JDK 11 构建 jar；JDK 17 仅用�
 
 相对 [`ros2-java/ros2_java`](https://github.com/ros2-java/ros2_java) `main` 的源码层改动：
 
-- **ROS 2 Galactic → Humble**：CI 工作流 `ubuntu-20.04` → `ubuntu-22.04`，
-  `required-ros-distributions`/`target-ros2-distro` `galactic` → `humble`；
-  README 安装片段 `source /opt/ros/galactic` → `humble`。
+- **ROS 2 Galactic → Humble**：源码改造为 Humble——Docker 镜像、手动配方、
+  README 片段均用 `source /opt/ros/humble`。上游 Galactic 时代的 CI 被**替换**
+  （而非简单 retarget）：本 fork 的
+  [CI](.github/workflows/build_and_test.yml) 经 Docker 路径构建桌面 jar/`.so`
+  与 Android AAR，新增的 tag 驱动
+  [发布](.github/workflows/release.yml)工作流将产物发布到 GitHub Releases。
 - **Java 字节码 target 1.6 → 1.8**：`rcljava/CMakeLists.txt` 与
   `rcljava_common/CMakeLists.txt` 的 `CMAKE_JAVA_COMPILE_FLAGS` 改为
   `-source/-target 1.8`，使 jar 可用 JDK 11/17 构建、JDK 8+ 运行。
